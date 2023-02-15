@@ -50,6 +50,16 @@ namespace lab1
         static extern int GetCurrencyFormat(uint Locale, uint dwFlags, string lpValue, CURRENCYFMT test, IntPtr lpCurrencyStr, int cchCurrency);
         [DllImport("user32.dll")]
         static extern bool OemToChar(IntPtr lpszSrc, [Out] StringBuilder lpszDst);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct UserRec
+        {
+            [MarshalAs(UnmanagedType.LPStruct)]
+            public int userParam1;
+        }
+        [DllImport("kernel32.dll")]
+        static extern int GetCurrencyFormat(uint Locale, uint dwFlags, string lpValue,
+           [In, MarshalAs(UnmanagedType.LPStruct)] UserRec userRec, IntPtr lpCurrencyStr, int cchCurrency);
         [DllImport("kernel32.dll")]
         static extern uint GetLastError();
         [StructLayout(LayoutKind.Sequential)]
@@ -325,13 +335,16 @@ namespace lab1
         [Obsolete]
         private void get_system_time()
         {
-            FILETIME fILETIME, fILETIME1, fILETIME2;
-            GetSystemTimes(out fILETIME, out fILETIME2, out fILETIME1); 
-            lblSystemTime.Text = "something: " + fILETIME.dwLowDateTime;
+            FILETIME idleTime, kernelTime, userTime;
+            GetSystemTimes(out idleTime, out kernelTime, out userTime);
+            ulong idleTimeLong = ((ulong)idleTime.dwHighDateTime << 32) + (uint)idleTime.dwLowDateTime;             
+            lblSystemTime.Text = "something: " + (idleTimeLong / TimeSpan.TicksPerSecond).ToString();
+
             TIME_ZONE_INFORMATION tIME_ZONE_INFORMATION = new TIME_ZONE_INFORMATION();
             uint h = GetTimeZoneInformation(out tIME_ZONE_INFORMATION);
             lblSystemTime.Text += "\ntime zone info" + tIME_ZONE_INFORMATION.StandardName;
-            
+
+            lblSystemTime.Text += "\nCalendar don't work";
         }
 
         private void get_api()
@@ -355,11 +368,27 @@ namespace lab1
         }
         private void get_currency()
         {
-            string str = "hola!";
+            string str = "200.0m!";
             CURRENCYFMT cURRENCYFMT = new CURRENCYFMT();
+            Decimal number = new Decimal();
             int temp = GetCurrencyFormat(0, 0, str, cURRENCYFMT, IntPtr.Zero, 0);
-            lblWinAPI.Text += "\nCurrency: ";
-            lblWinAPI.Text += cURRENCYFMT.uiNumDigits;
+
+            if (temp != 0)
+            {
+                IntPtr ptrCurrencyStr = Marshal.AllocHGlobal((int)temp);
+
+                temp = GetCurrencyFormat(0, 0, str, cURRENCYFMT, ptrCurrencyStr, (int)temp);
+                lblWinAPI.Text += "\nCurrency: ";
+                lblWinAPI.Text = cURRENCYFMT.lpDecimalSep;
+
+                Marshal.FreeHGlobal(ptrCurrencyStr);
+            }
+            else { 
+                int error = Marshal.GetLastWin32Error(); 
+
+                lblWinAPI.Text += "\nCurrency2: ";
+                lblWinAPI.Text += error.ToString();
+            }
         }
     }
 }
